@@ -33,7 +33,7 @@ app.use(
         "https://fonts.gstatic.com",
         "https://cdn.jsdelivr.net"
       ],
-      "connect-src": ["'self'", "https://registry.npmjs.org"],
+      "connect-src": ["'self'", "https://registry.npmjs.org", "https://node-initializer.onrender.com"],
     },
   })
 );

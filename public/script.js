@@ -106,7 +106,7 @@ document
             port: port || 3000,
         };
 
-        fetch("http://localhost:3000/create-project", {
+        fetch("/create-project", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
