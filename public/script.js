@@ -7,7 +7,6 @@ var dep = {
 
 var devDep = {
     nodemon: "latest",
-    "@types/express": "latest",
 }
 
 var isTypescriptSelected = false;
@@ -23,10 +22,12 @@ document.getElementById("projectLanguage").addEventListener('click', (e) => {
             dep['typescript'] = 'latest';
             devDep['ts-node'] = 'latest';
             devDep['@types/node'] = 'latest';
+            devDep['@types/express'] = "latest";
         } else {
             delete dep['typescript'];
             delete devDep['ts-node'];
             delete devDep['@types/node'];
+            delete devDep['@types/express'];
         }
     }
 })
