@@ -1,12 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-const archiver = require("archiver");
-const stream = require("stream");
 const Joi = require("joi"); // for validation
 const helmet = require("helmet");
 const path = require("path");
 const app = express();
+const generateProjectZip = require("./utils/generateProjectFiles");
 require('dotenv').config()
+
 
 app.use(cors({
   origin: process.env.ORIGIN || "*",
@@ -26,8 +26,10 @@ app.use(
         "'self'",
         "https://cdn.jsdelivr.net",
         "https://fonts.googleapis.com",
+        "https://img.icons8.com",
         "'unsafe-inline'"
       ],
+      "img-src": ["'self'", "data:", "https://img.icons8.com"],
       "font-src": [
         "'self'",
         "https://fonts.gstatic.com",
@@ -56,68 +58,23 @@ app.get("/", (req, res) => {
  * @desc Generates and returns a project ZIP containing package.json and server.js
  */
 app.post("/create-project", async (req, res) => {
+
   try {
     const schema = Joi.object({
       packageJson: Joi.object().required(),
-      port: Joi.number().optional()
+      port: Joi.number().optional(),
+      folderStructure: Joi.string().valid("basic", "mvc", "modular").optional(),
+      isTypescriptSelected: Joi.boolean().optional(),
     });
 
     const { error, value } = schema.validate(req.body);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
+
     }
 
-    const { packageJson, port } = value;
+    await generateProjectZip(res, value);
 
-    const packageContent = JSON.stringify(packageJson, null, 2); // Pretty JSON
-
-    const serverJsContent = `
-      const express = require('express');
-      const app = express();
-      const PORT = process.env.PORT || ${port || 3000};
-
-      app.use(express.json());
-      app.use(express.urlencoded({ extended: true }));
-
-      app.get('/', (req, res) => {
-      res.send('Server is running on port ' + PORT);
-      });
-
-      app.listen(PORT, () => {
-      console.log(\`Server running at http://localhost:\${PORT}\`);
-      });
-      `.trim();
-
-    const readmeContent = `
-      # Project Setup Instructions
-
-      1. Install dependencies:
-        \`npm install\`
-
-      2. Start the project:
-        \`npm start\`
-
-      This project uses Express.js.
-
-      Make sure Node.js is installed before running the above commands.
-      `.trim();
-
-    // Create in-memory ZIP
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    const passthroughStream = new stream.PassThrough();
-
-    res.setHeader("Content-Disposition", "attachment; filename=project.zip");
-    res.setHeader("Content-Type", "application/zip");
-
-    archive.pipe(passthroughStream);
-    passthroughStream.pipe(res); // stream ZIP to client
-
-    // Append files to archive
-    archive.append(packageContent, { name: "package.json" });
-    archive.append(serverJsContent, { name: packageJson.main || "server.js" });
-    archive.append(readmeContent, { name: "README.txt" }); // 👈 Added guide file
-
-    await archive.finalize(); // finish ZIP creation
   } catch (error) {
     next(error);
   }

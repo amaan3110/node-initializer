@@ -2,8 +2,34 @@ const input = document.getElementById("dependency");
 const dependencyList = document.getElementById("dependencyList");
 
 var dep = {
-    express: "5.1.0",
+    express: "latest",
 };
+
+var devDep = {
+    nodemon: "latest",
+    "@types/express": "latest",
+}
+
+var isTypescriptSelected = false;
+
+document.getElementById("projectLanguage").addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT' && e.target.type === "radio") {
+        const entryPoint = document.getElementById("entryPoint");
+        const note = document.getElementById('noteForTS')
+        isTypescriptSelected = e.target.id === 'ts';
+        entryPoint.value = isTypescriptSelected ? "index.ts" : "index.js";
+        note.innerHTML = isTypescriptSelected ? "Type definitions are managed automatically — no need to install them manually." : ''
+        if (isTypescriptSelected) {
+            dep['typescript'] = 'latest';
+            devDep['ts-node'] = 'latest';
+            devDep['@types/node'] = 'latest';
+        } else {
+            delete dep['typescript'];
+            delete devDep['ts-node'];
+            delete devDep['@types/node'];
+        }
+    }
+})
 
 async function fetchPackages() {
     const query = input.value;
@@ -28,10 +54,23 @@ async function fetchPackages() {
             const version = pkg.package.version || "latest";
 
             const li = document.createElement("li");
-            li.addEventListener("click", () => {
+            li.addEventListener("click", async () => {
+
+                if (dep[name] || name.startsWith('@types/')) {
+                    alert(`${name} is already added.`);
+                    return;
+                }; // If already added, do not add again
                 addDependencyToUI(name, description, version);
-                if (dep[name]) return;
-                dep[name] = version; // Store the dependency
+                dep[name] = version || 'latest'; // Store the dependency
+
+                if (isTypescriptSelected) {
+                    const needsTypes = await needsTypeDefinition(name);
+                    if (needsTypes) {
+                        if (devDep[`@types/${name}`]) return;
+                        devDep[`@types/${name}`] = "latest";
+                    }
+                }
+
             });
             li.className = "border-bottom p-1 py-2 dependency-item";
             li.innerHTML = `
@@ -82,29 +121,42 @@ function removeDependency(button, name) {
 document
     .getElementById("generateFile")
     .addEventListener("click", async (e) => {
-        e.preventDefault();
+        const button = e.target;
         const entryPoint = document.getElementById("entryPoint").value;
         const port = document.getElementById("port").value;
         const description = document.getElementById("description").value;
-
+        const folderStructure = document.querySelector('input[name="folderStructure"]:checked').id;
         const packageJson = {
             name: "node-initializer",
             version: "1.0.0",
             main: entryPoint,
             scripts: {
                 start: `node ${entryPoint}`,
+                dev: isTypescriptSelected ? `ts-node ${entryPoint}` : `nodemon ${entryPoint}`,
+                test: "echo \"Error: no test specified\" && exit 1"
             },
             description: description,
             keywords: [],
             author: "",
             license: "ISC",
             dependencies: dep,
+            devDependencies: devDep
         };
 
         const data = {
             packageJson,
             port: port || 3000,
+            folderStructure,
+            isTypescriptSelected
         };
+
+
+        button.disabled = true;
+        button.innerHTML = ''
+        button.innerHTML = `
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        Generating...
+        `;
 
         fetch("/create-project", {
             method: "POST",
@@ -113,18 +165,68 @@ document
             },
             body: JSON.stringify(data),
         })
-            .then((res) => res.blob())
-            .then((blob) => {
+            .then(async (res) => {
+                if (!res.ok) {
+                    throw new Error("Failed to create project");
+                }
+                const fileName = res.headers.get("Content-Disposition").split("filename=")[1]
+                    .replace(/["']/g, "")
+                    .trim();
+
+                const blob = await res.blob()
+
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `project-${Date.now()}.zip`;
+                a.download = fileName;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
             })
             .catch((error) => {
                 console.error("Error:", error);
+            }).finally(() => {
+                button.disabled = false;
+                button.innerHTML = ''
+                button.innerHTML = `<i class="bi bi-rocket-takeoff-fill me-1"></i> Generate`;
             });
     });
+
+
+
+async function needsTypeDefinition(pkgName) {
+    try {
+        // Step 1: Check if main package has built-in types
+        const url = `https://registry.npmjs.org/${pkgName}`;
+        const res = await fetch(url);
+        if (!res.ok) return false;
+
+        const data = await res.json();
+        const latestVersion = data["dist-tags"]?.latest;
+        const latestMeta = data.versions?.[latestVersion];
+
+        // If the package already includes types, no need for @types/...
+        if (latestMeta?.types || latestMeta?.typings) {
+            return false;
+        }
+
+        // Step 2: Check if @types/package exists
+        const typesName = pkgName.startsWith('@')
+            ? `@types/${pkgName.slice(1).replace('/', '__')}`
+            : `@types/${pkgName}`;
+        const typesUrl = `https://registry.npmjs.org/${encodeURIComponent(typesName)}`;
+        const typesRes = await fetch(typesUrl);
+        return typesRes.status === 200;
+    } catch (err) {
+        console.error(`Error checking types for ${pkgName}:`, err);
+        return false;
+    }
+}
+
+// Check if the window width is less than or equal to 576px (Bootstrap's small breakpoint)
+// and alert the user if so
+if (window.innerWidth <= 576) {
+    alert("This website is not optimized for mobile devices. Please use a desktop browser for the best experience.");
+}
+
 

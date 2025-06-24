@@ -1,2 +1,4 @@
 .env
 node_modules
+utils/gemini_folder_log.txt
+utils/gemini_server_log.txt
