@@ -149,7 +149,7 @@ async function getAIGeneratedData(prompt) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'mistralai/Mistral-7B-Instruct-v0.2', // Free OSS model
+                model: 'deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free', // Free OSS model
                 messages: [
                     { role: 'system', content: 'You are a helpful coding assistant.' },
                     { role: 'user', content: prompt }
