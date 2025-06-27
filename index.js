@@ -6,6 +6,7 @@ const path = require("path");
 const app = express();
 const generateProjectZip = require("./utils/generateProjectFiles");
 require('dotenv').config()
+const pkg = require("./package.json");
 
 
 app.use(cors({
@@ -50,7 +51,7 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (req, res) => {
-  res.render("index");
+  res.render("index", { version: pkg.version });
 });
 
 /**
